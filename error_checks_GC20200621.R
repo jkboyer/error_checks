@@ -33,7 +33,7 @@
 #Open the database file before running code to connect R to database.  Access
 #doesn't like to open a file that R is already connected to
 
-setwd("\\\\flag-server/Office/Grand Canyon Downstream/Databases/2019")
+#setwd("\\\\flag-server/Office/Grand Canyon Downstream/Databases/2019")
 #setwd("C:/Users/jboyer.AGFD_PHX/Documents")
 
 require(RODBC) #database interface
@@ -46,7 +46,7 @@ require(chron) #for times (base R datetimes include date, can't do time only)
 #in Rstudio Tools/Global Options/General, then click change button by R version
 #database file should be closed - does not like connecting when access is open
 #is ok to reopen access once you have connected and fetched needed tables
-db <- odbcConnectAccess2007("GC20190518.accdb", case = "nochange")
+db <- odbcConnectAccess2007("./data/GC20200621.accdb", case = "nochange")
 odbcGetInfo(db) #info about database
 sqlTables(db) #see what tables are in database
 
@@ -61,15 +61,15 @@ site <- sqlFetch(db, "FISH_T_SAMPLE", na.strings = c(""," ","NA"))
 odbcClose(db)
 
 #load turbidity and temperature data
-turbidity <- read.csv("water_quality_2019.csv")
+turbidity <- read.csv("./data/GC20200621_turbidity_temperature.csv")
 
 #load site/station reference table from database
-setwd("//flag-server/Office/Grand Canyon Downstream/Data Error Checks/2019")
-station <- read.csv("GC_All_Sites.csv")
+#setwd("//flag-server/Office/Grand Canyon Downstream/Data Error Checks/2019")
+station <- read.csv("./data/GC_All_Sites.csv")
 
 #Load scanner download PIT tag data
-setwd("\\\\flag-server/Office/Grand Canyon Downstream/Scanner Downloads/2019")
-scan <- read_csv("GC20190518_all_PIT_tags.csv")
+#setwd("\\\\flag-server/Office/Grand Canyon Downstream/Scanner Downloads/2019")
+scan <- read_csv("./data/GC20200621_all_PIT_tags.csv")
 
 ################## FORMAT DATA
 
@@ -82,7 +82,7 @@ site <- site[, colSums(site != 0, na.rm = TRUE) > 0]
 #format START_DATE columns as date (POSIXct) format
 site$START_DATE <- as.Date(site$START_DATE, format = "%m/%d/%Y")
 site$END_DATE <- as.Date(site$END_DATE, format = "%m/%d/%Y")
-turbidity$START_DATE <- as.Date(turbidity$START_DATE, format = "%m/%d/%Y")
+turbidity$START_DATE <- as.Date(turbidity$date)
 #next line will give warning, is fine, is just telling you that it couldn't
 #convert the missing times (NA) to times format
 #site$START_TIME <- times(paste0(site$START_TIME, ":00"))
@@ -105,8 +105,9 @@ site$START_DATETIME <- as.POSIXct(ifelse(is.na(site$START_DATETIME) == FALSE,
 
 
 #add end RM to each site
-R <- station[station$SIDE == "R",] #dataframe with right only
-L <- station[station$SIDE == "L",] #with left only
+station$start_RM = station$RiverMile_100ths
+R <- station[station$RiverSide == "R",] #dataframe with right only
+L <- station[station$RiverSide == "L",] #with left only
 #error messages about NAs for next two lines are fine, ignore them
 RRM_next <- as.numeric(c(as.vector(R$start_RM), "NA")) #vector of next RM
 LRM_next <- as.numeric(c(as.vector(L$start_RM), "NA"))
@@ -114,8 +115,9 @@ R$end_RM <- RRM_next[2:length(RRM_next)] #add next RM vector as end_RM column
 L$end_RM <- LRM_next[2:length(LRM_next)]
 station <- rbind(R, L) #bind R, L dataframes to make complete station dataframe
 station$site_length <- station$end_RM - station$start_RM
-station <- station[, c("SiteID", "start_RM", "end_RM", "SIDE")]
+station <- station[, c("SiteID", "start_RM", "end_RM", "RiverSide")]
 colnames(station) <- c("DATASHEET_SAMPLE_ID", "start_RM", "end_RM", "SIDE")
+rm(R, L)
 
 ############################# CHECK SITE DATA
 #sort below columns in site dataframe to see high and low values
@@ -144,6 +146,8 @@ dup.sites <- summarize(group_by(site, DATASHEET_SAMPLE_ID),
 dup.stations <- site %>%
   group_by(STATION_ID) %>%
   summarize(n = length(STATION_ID))
+
+rm(dup.sites, dup.stations) #no longer needed, remove
 
 #see if sample IDs match river mile and side
 #CHECK the two columns created below for "FALSE", indicating a mismatch
@@ -183,12 +187,15 @@ ggplot(site[is.na(site$TRIP_ID) == FALSE,], aes(START_DATETIME, START_RM)) +
 #entered sites are correct (according to mapbook)
 #approx RM 260 - 280 is wrong in GCMRC database - if errors show up in these RMs
 #entered data is probably correct and GCMRC data wrong
+station$DATASHEET_SAMPLE_ID <- gsub("_", "", station$DATASHEET_SAMPLE_ID)
 site$ID.match <- ifelse(site$GEAR_CODE == "AN", TRUE,
                     site$DATASHEET_SAMPLE_ID %in% station$DATASHEET_SAMPLE_ID)
 
 site <- merge(site, station, by = "DATASHEET_SAMPLE_ID",  all.x = TRUE)
-site$start.match <- site$START_RM == site$start_RM
-site$end.match <- site$END_RM == site$end_RM
+site$start.match <- ifelse(site$GEAR_CODE == "MHB", TRUE,
+                           site$START_RM == site$start_RM)
+site$end.match <- ifelse(site$GEAR_CODE == "MHB", TRUE,
+                         site$END_RM == site$end_RM)
 
 
 #see if TURBIDITY_NTU matches categorical turbidity
@@ -198,6 +205,7 @@ site$turbidity.match <- site$TURBIDITY ==
                                     ifelse(site$TURBIDITY_NTU < 60, "L", "M"))
 
 #see if entered PIT tags have match in scanner downloads
+#550 missing - seems like error with scanner download, not data entry
 tags <- fish[!(is.na(fish$PITTAG)),] #tagged fish only
 tags <- merge(x = tags, y = scan, by = "PITTAG", all.x = TRUE) #join
 #CHECK tags in tag.errors dataframe for data entry errors
