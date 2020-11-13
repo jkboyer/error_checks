@@ -69,7 +69,7 @@ station <- read.csv("./data/GC_All_Sites.csv")
 
 #Load scanner download PIT tag data
 #setwd("\\\\flag-server/Office/Grand Canyon Downstream/Scanner Downloads/2019")
-scan <- read_csv("./data/GC20200621_all_PIT_tags.csv")
+scan <- read_csv("./data/GC20200621_all_scanner_downloads.csv")
 
 ################## FORMAT DATA
 
@@ -198,18 +198,22 @@ site$end.match <- ifelse(site$GEAR_CODE == "MHB", TRUE,
                          site$END_RM == site$end_RM)
 
 
-#see if TURBIDITY_NTU matches categorical turbidity
-#CHECK for entry errors if any site returns FALSE in turbidity.match column
-site$turbidity.match <- site$TURBIDITY ==
-                                 ifelse(site$TURBIDITY_NTU > 150, "H",
-                                    ifelse(site$TURBIDITY_NTU < 60, "L", "M"))
-
 #see if entered PIT tags have match in scanner downloads
 #550 missing - seems like error with scanner download, not data entry
 tags <- fish[!(is.na(fish$PITTAG)),] #tagged fish only
+
+
+length(unique(fish$PITTAG[!is.na(fish$PITTAG)])) #n unique tags datasheets
+length(unique(scan$PITTAG[!is.na(scan$PITTAG)])) #n unique tags scanner
+
+
+
 tags <- merge(x = tags, y = scan, by = "PITTAG", all.x = TRUE) #join
 #CHECK tags in tag.errors dataframe for data entry errors
 tag.errors <- tags[is.na(tags$date),]
+tag.errors <- tag.errors %>%
+  dplyr::select(PITTAG, PITTAG_RECAP, SPECIES_CODE, TOTAL_LENGTH, DATASHEET_SAMPLE_ID,
+                START_DATETIME, START_DATE, GEAR_CODE, CREW)
 
 #CHECK for duplicate tag entries (sometimes boatmen accidentally write down the
 # same tag twice)
@@ -218,6 +222,10 @@ duplicate.tags <- fish[!is.na(fish$PITTAG), ]
 duplicate.tags <- duplicate.tags[duplicated(duplicate.tags$PITTAG) |
                   #check backwards too, to get original from duplicate pair
                          duplicated(duplicate.tags$PITTAG, fromLast = TRUE),]
+duplicate.tags <- duplicate.tags %>%
+  dplyr::select(PITTAG, PITTAG_RECAP, SPECIES_CODE, TOTAL_LENGTH, DATASHEET_SAMPLE_ID,
+         START_DATETIME, START_DATE, GEAR_CODE, CREW)
+
 
 #see if TOTAL_CATCH is correct
 #calculate catch per site
