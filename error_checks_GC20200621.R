@@ -257,11 +257,15 @@ plot(TOTAL_LENGTH ~ FORK_LENGTH, data = bhs,  main = "Bluehead")
 text(TOTAL_LENGTH ~ FORK_LENGTH, data = bhs, labels = bhs$START_RM)
 
 plot(WEIGHT ~ TOTAL_LENGTH, data = bhs,  main = "Bluehead")
-text(WEIGHT ~ TOTAL_LENGTH, data = bhs, labels = fms$START_RM)
+text(WEIGHT ~ TOTAL_LENGTH, data = bhs, labels = bhs$START_RM)
 
 hbc <- fish[fish$SPECIES_CODE == "HBC", ]
 plot(TOTAL_LENGTH ~ FORK_LENGTH, data = hbc,  main = "Humpback Chub")
 text(TOTAL_LENGTH ~ FORK_LENGTH, data = hbc, labels = hbc$ACCESS_SAMPLE_ID)
+
+plot(WEIGHT ~ TOTAL_LENGTH, data = hbc,  main = "Humpback")
+text(WEIGHT ~ TOTAL_LENGTH, data = hbc, labels = hbc$START_RM)
+
 
 rbt <- fish[fish$SPECIES_CODE == "RBT", ]
 plot(TOTAL_LENGTH ~ FORK_LENGTH, data = rbt,  main = "Rainbow Trout")
