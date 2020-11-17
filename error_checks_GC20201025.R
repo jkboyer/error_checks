@@ -20,10 +20,9 @@
 #        FISH_T_SAMPLE (site data)
 #        FISH_T_LF_STATION_REFERENCE (GCMRC reference site/station data)
 #
-#        "water_quality_2017.csv"  turbidity and temp data, table with 3
-#               columns: START_DATE, turbidity, and water_temp
+#        "GC20201025_turbidity_temperature.csv"  turbidity and temp data
 
-#        "GC20170402_all_PIT_tags.csv" scanner download data for PIT tags
+#        "TRIP_ID_all_PIT_tags.csv" scanner download data for PIT tags
 #               columns: date, time, PITTAG, boat
 
 #outputs: none
@@ -44,9 +43,13 @@ require(chron) #for times (base R datetimes include date, can't do time only)
 #connect to database
 #you MUST be running 32 bit R, not 64 bit R, for this to work
 #in Rstudio Tools/Global Options/General, then click change button by R version
+
 #database file should be closed - does not like connecting when access is open
 #is ok to reopen access once you have connected and fetched needed tables
-db <- odbcConnectAccess2007("./data/GC20200621.accdb", case = "nochange")
+
+#use odbcConnectAccess() for .mdb files
+#use odbcConnectAccess2007() for .accdb files
+db <- odbcConnectAccess2007("./data/GC20201025.accdb", case = "nochange")
 odbcGetInfo(db) #info about database
 sqlTables(db) #see what tables are in database
 
@@ -61,7 +64,7 @@ site <- sqlFetch(db, "FISH_T_SAMPLE", na.strings = c(""," ","NA"))
 odbcClose(db)
 
 #load turbidity and temperature data
-turbidity <- read.csv("./data/GC20200621_turbidity_temperature.csv")
+turbidity <- read.csv("./data/GC20201025_turbidity_temperature.csv")
 
 #load site/station reference table from database
 #setwd("//flag-server/Office/Grand Canyon Downstream/Data Error Checks/2019")
@@ -69,9 +72,9 @@ station <- read.csv("./data/GC_All_Sites.csv")
 
 #Load scanner download PIT tag data
 #setwd("\\\\flag-server/Office/Grand Canyon Downstream/Scanner Downloads/2019")
-scan <- read_csv("./data/GC20200621_all_scanner_downloads.csv")
+scan <- read_csv("./data/GC20201025_scanner_downloads.csv")
 
-################## FORMAT DATA
+# FORMAT DATA ##########
 
 #remove unnecessary columns with no data (only NA, or only 0 and NA)
 fish <- fish[, unlist(lapply(fish, function(x) !all(is.na(x))))] #remove NA
@@ -95,15 +98,6 @@ site$START_DATETIME <- as.POSIXct(ifelse(is.na(site$START_DATETIME) == FALSE,
                                paste(as.character(site$START_DATE),
                                          as.character(site$START_TIME)))))
 
-#subset station to only downstream sites (remove lees ferry sites)
-#$type <- substr(station$STATION_ID, 1,2)
-#station <- station[station$type =="S+",]
-#station <- station[, unlist(lapply(station, function(x) !all(is.na(x))))]
-#format station IDs in station dataframe to match format in site data
-#station$start_RM <- as.numeric(gsub("[[:alpha:]]", "", station$UNPADDED_STATION_ID))
-#station$siteID <- paste(station$start_RM, station$SIDE, sep = "")
-
-
 #add end RM to each site
 station$start_RM = station$RiverMile_100ths
 R <- station[station$RiverSide == "R",] #dataframe with right only
@@ -119,7 +113,7 @@ station <- station[, c("SiteID", "start_RM", "end_RM", "RiverSide")]
 colnames(station) <- c("DATASHEET_SAMPLE_ID", "start_RM", "end_RM", "SIDE")
 rm(R, L)
 
-############################# CHECK SITE DATA
+# CHECK SITE DATA #############
 #sort below columns in site dataframe to see high and low values
 #these checks could also be done in access if you prefer
 #CHECK for data entry errors for any site where values are not plausible
@@ -138,9 +132,6 @@ rm(R, L)
 dup.sites <- site %>%
   group_by(DATASHEET_SAMPLE_ID) %>%
   summarize(n = length(DATASHEET_SAMPLE_ID))
-
-dup.sites <- summarize(group_by(site, DATASHEET_SAMPLE_ID),
-                       n = length(DATASHEET_SAMPLE_ID))
 
 #station ID only relevant to hoop nets, does not exist for electrofishing
 dup.stations <- site %>%
